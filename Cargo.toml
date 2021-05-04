@@ -12,9 +12,10 @@ documentation = "https://docs.rs/thicc"
 
 [features]
 default = []
-std = []
+std = ["alloc"]
 alloc = []
 
 [dependencies]
 cfg-if = "1.0"
-libc = "0.2"
+impls = "1.0"
+libc = "0.2.94"
