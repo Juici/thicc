@@ -138,9 +138,7 @@ impl WCStr {
     pub fn chars(&self) -> Chars<'_, WChar> {
         // SAFETY: Safe references to `WCStr` can only exist if they point to
         //         memory that has a NUL-terminator.
-        Chars {
-            iter: self.to_slice().iter(),
-        }
+        Chars::new(self.as_ptr())
     }
 }
 
