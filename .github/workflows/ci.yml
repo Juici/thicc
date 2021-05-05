@@ -1,4 +1,5 @@
 name: ci
+
 on:
   pull_request:
   push:
@@ -12,26 +13,29 @@ env:
 jobs:
   test:
     name: test
+    runs-on: ${{ matrix.os }}
     env:
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        build:
-#          - pinned
-#          - stable
-#          - beta
-          - nightly
         include:
-#          - build: pinned
-#            rust: 1.53.0
-#          - build: stable
-#            rust: stable
-#          - build: beta
-#            rust: beta
-          - build: nightly
-            rust: nightly
+          # Minimum supported version.
+#          - rust: 1.53.0
+#            os: ubuntu-latest
+          # Standard toolchain versions.
+#          - rust: stable
+#            os: ubuntu-latest
+#          - rust: beta
+#            os: ubuntu-latest
+          - rust: nightly
+            os: ubuntu-latest
+          # Platform support.
+          - rust: nightly
+            os: windows-latest
+          - rust: nightly
+            os: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2

@@ -5,17 +5,13 @@ use core::mem;
 
 use crate::char::Wide;
 
-#[derive(Clone, Debug)]
-pub struct DecodeWideError(());
-
-impl fmt::Display for DecodeWideError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt("failed to decode wide character", f)
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecodeWideError<T> {
+    code: T,
 }
 
 pub trait Decode: Copy + Eq + Ord + 'static {
-    fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError>>;
+    fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError<Self>>>;
     fn size_hint(wcslen: usize) -> (usize, Option<usize>);
 }
 
@@ -43,7 +39,7 @@ macro_rules! impl_decode_utf16 {
 
             impl Decode for $ty {
                 #[inline]
-                fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError>> {
+                fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError<$ty>>> {
                     // SAFETY: Safe references to `Chars` can only exist if they point to
                     //         memory that has a NUL-terminator.
                     let u = unsafe { *(iter.ptr as *const u16) };
@@ -59,14 +55,14 @@ macro_rules! impl_decode_utf16 {
                         Some(Ok(unsafe { char::from_u32_unchecked(u as u32) }))
                     } else if u >= 0xDC00 {
                         // A trailing surrogate.
-                        Some(Err(DecodeWideError(())))
+                        Some(Err(DecodeWideError { code: unsafe { mem::transmute(u) } }))
                     } else {
                         // SAFETY: Safe references to `Chars` can only exist if they point to
                         //         memory that has a NUL-terminator.
                         let u2 = unsafe { *(iter.ptr as *const u16) };
                         // Check if missing trailing surrogate.
                         if u2 == u16::NUL || u2 < 0xDC00 || u2 > 0xDFFF {
-                            return Some(Err(DecodeWideError(())));
+                            return Some(Err(DecodeWideError { code: unsafe { mem::transmute(u) } }));
                         }
                         // SAFETY: Not yet at NUL-terminator.
                         iter.ptr = unsafe { iter.ptr.add(1) };
@@ -98,7 +94,7 @@ macro_rules! impl_decode_utf32 {
 
             impl Decode for $ty {
                 #[inline]
-                fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError>> {
+                fn next(iter: &mut Chars<'_, Self>) -> Option<Result<char, DecodeWideError<$ty>>> {
                     // SAFETY: Safe references to `Chars` can only exist if they point to
                     //         memory that has a NUL-terminator.
                     let u = unsafe { *(iter.ptr as *const u32) };
@@ -111,7 +107,7 @@ macro_rules! impl_decode_utf32 {
 
                     match char::from_u32(u) {
                         Some(c) => Some(Ok(c)),
-                        None => Some(Err(DecodeWideError(())))
+                        None => Some(Err(DecodeWideError { code: unsafe { mem::transmute(u) } }))
                     }
                 }
 
@@ -143,7 +139,7 @@ impl<'a, T: Wide> Chars<'a, T> {
 }
 
 impl<'a, T: Wide> Iterator for Chars<'a, T> {
-    type Item = Result<char, DecodeWideError>;
+    type Item = Result<char, DecodeWideError<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         T::next(self)
@@ -156,3 +152,20 @@ impl<'a, T: Wide> Iterator for Chars<'a, T> {
 }
 
 impl<T: Wide> FusedIterator for Chars<'_, T> {}
+
+impl<T: Wide> DecodeWideError<T> {
+    /// Returns the wide character that caused this error.
+    #[inline]
+    pub fn code(&self) -> T {
+        self.code
+    }
+}
+
+impl<T: Wide> fmt::Display for DecodeWideError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to decode wide character: {:x}", self.code)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Wide> std::error::Error for DecodeWideError<T> {}

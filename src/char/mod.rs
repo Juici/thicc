@@ -1,3 +1,5 @@
+use core::fmt;
+
 mod convert;
 
 pub use self::convert::{Chars, DecodeWideError};
@@ -6,7 +8,19 @@ pub use self::convert::{Chars, DecodeWideError};
 pub type WChar = libc::wchar_t;
 
 /// A trait representing a UTF wide character.
-pub trait Wide: Copy + Eq + Ord + convert::Decode + 'static {
+pub trait Wide:
+    Copy
+    + Eq
+    + Ord
+    + fmt::Display
+    + fmt::Debug
+    + fmt::Binary
+    + fmt::LowerHex
+    + fmt::UpperHex
+    + fmt::Octal
+    + convert::Decode
+    + 'static
+{
     /// The NUL control character.
     const NUL: Self;
 }
