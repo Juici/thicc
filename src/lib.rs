@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(const_fn)]
+#![feature(const_fn_trait_bound)]
 #![feature(const_raw_ptr_deref)]
 #![feature(extern_types)]
 #![feature(min_specialization)]
