@@ -27,7 +27,7 @@ macro_rules! wcslen {
 
         // SAFETY: Safe references can only exist if they point to memory that
         //         has a NUL-terminator.
-        unsafe { $crate::char::SpecWide::wcslen($self.ptr) }
+        unsafe { $crate::char::SpecLen::wcslen($self.ptr) }
     }};
 }
 

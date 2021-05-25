@@ -7,9 +7,14 @@ pub use self::convert::{Chars, DecodeWideError};
 /// A system wide character, `wchar_t`.
 pub type WChar = libc::wchar_t;
 
+mod private {
+    pub trait Sealed {}
+}
+
 /// A trait representing a UTF wide character.
 pub trait Wide:
-    Copy
+    private::Sealed
+    + Copy
     + Eq
     + Ord
     + fmt::Display
@@ -19,6 +24,7 @@ pub trait Wide:
     + fmt::UpperHex
     + fmt::Octal
     + convert::Decode
+    + wmemchr::Wide
     + 'static
 {
     /// The NUL control character.
@@ -28,6 +34,8 @@ pub trait Wide:
 macro_rules! impl_wide {
     ($($ty:ident)*) => {
         $(
+            impl private::Sealed for $ty {}
+
             impl Wide for $ty {
                 const NUL: $ty = 0;
             }
@@ -38,12 +46,15 @@ impl_wide!(u16 u32 i16 i32);
 
 assert_impls!(WChar: Wide);
 
-pub trait SpecWide: Wide {
+pub(crate) trait SpecLen: Wide {
     unsafe fn wcslen(buf: *const Self) -> usize;
+}
+
+pub(crate) trait SpecFind: Wide {
     fn wmemchr(needle: Self, haystack: &[Self]) -> Option<usize>;
 }
 
-impl<T: Wide> SpecWide for T {
+impl<T: Wide> SpecLen for T {
     default unsafe fn wcslen(buf: *const Self) -> usize {
         let mut end = buf;
         while *end != T::NUL {
@@ -51,32 +62,32 @@ impl<T: Wide> SpecWide for T {
         }
         end.offset_from(buf) as usize
     }
+}
 
+impl<T: Wide> SpecFind for T {
+    #[inline]
     default fn wmemchr(needle: Self, haystack: &[Self]) -> Option<usize> {
-        let mut pos = 0;
-        for &c in haystack {
-            if c == needle {
-                return Some(pos);
-            }
-            pos += 1;
-        }
-        None
+        wmemchr::wmemchr(needle, haystack)
     }
 }
 
-impl SpecWide for WChar {
+impl SpecLen for WChar {
     #[inline]
     unsafe fn wcslen(buf: *const Self) -> usize {
         libc::wcslen(buf)
     }
-
-    #[inline]
-    fn wmemchr(needle: Self, haystack: &[Self]) -> Option<usize> {
-        let p = unsafe { libc::wmemchr(haystack.as_ptr(), needle, haystack.len()) };
-        if p.is_null() {
-            None
-        } else {
-            Some(unsafe { p.offset_from(haystack.as_ptr()) } as usize)
-        }
-    }
 }
+
+// TODO: Use libc::wmemchr implementation if the target platform provides a
+//       good implementation.
+// impl SpecFind for WChar {
+//     #[inline]
+//     fn wmemchr(needle: Self, haystack: &[Self]) -> Option<usize> {
+//         let p = unsafe { libc::wmemchr(haystack.as_ptr(), needle, haystack.len()) };
+//         if p.is_null() {
+//             None
+//         } else {
+//             Some(unsafe { p.offset_from(haystack.as_ptr()) } as usize)
+//         }
+//     }
+// }

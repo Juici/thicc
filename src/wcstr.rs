@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 use core::mem;
 use core::slice;
 
-use crate::char::{Chars, SpecWide, WChar, Wide};
+use crate::char::{Chars, WChar, Wide};
 
 extern "C" {
     // HACK: Extern type to prevent `WCStr` from being sized.
@@ -124,7 +124,9 @@ impl<T: Wide> WCStr<T> {
     /// assert!(WCStr::from_slice_with_nul(v).is_err());
     /// ```
     pub fn from_slice_with_nul(slice: &[T]) -> Result<&WCStr<T>, FromSliceWithNulError> {
-        let nul_pos = SpecWide::wmemchr(T::NUL, slice);
+        use crate::char::SpecFind;
+
+        let nul_pos = SpecFind::wmemchr(T::NUL, slice);
         if let Some(nul_pos) = nul_pos {
             if nul_pos + 1 != slice.len() {
                 return Err(FromSliceWithNulError::interior_nul(nul_pos));
@@ -303,9 +305,11 @@ impl<T: Wide> WCStr<T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
+        use crate::char::SpecLen;
+
         // SAFETY: Safe references to `WCStr<T>` can only exist if they point to
         //         memory that has a NUL-terminator.
-        unsafe { SpecWide::wcslen(self.as_ptr()) }
+        unsafe { SpecLen::wcslen(self.as_ptr()) }
     }
 
     /// Returns an iterator over the [`char`]s of a wide string.
